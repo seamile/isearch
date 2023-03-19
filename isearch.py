@@ -107,5 +107,8 @@ if __name__ == '__main__':
 
     hash_func = {'ahash': ahash, 'dhash': dhash, 'phash': phash}[args.algorithm]
 
-    if is_image(args.baseimg):
+    if os.path.isfile(args.baseimg) and is_image(args.baseimg):
         search(args.baseimg, args.gallery, hash_func)
+    else:
+        print(f'{args.baseimg} is not a image')
+        exit(1)
