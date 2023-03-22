@@ -89,20 +89,25 @@ def search(baseimg: str, gallery, hash_func):
         hm = hamming_distance(s_hash, i_hash)
         print(f' ({hm})    ', end='\r')
 
-        if hm == 0:
-            heapq = [(hm, ipath)]
-            break
-        elif len(heapq) < heap_height:
-            heappush(heapq, (-hm, ipath))
+        if hm > 10:
+            continue
         else:
-            heappushpop(heapq, (-hm, ipath))
+            if hm == 0:
+                heapq = [(hm, ipath)]
+                break
+            elif len(heapq) < heap_height:
+                heappush(heapq, (-hm, ipath))
+            else:
+                heappushpop(heapq, (-hm, ipath))
 
-    height = min(num, heap_height)  # type: ignore
-    res = [heappop(heapq) for _ in range(height)]
+    res = [heappop(heapq) for _ in range(len(heapq))]
 
-    print(f'\n\nImages similar to {baseimg}:')
-    for i, (hm, ipath) in enumerate(res[::-1], start=1):
-        print(f'{i}. {ipath} ({(64+hm) / 64 * 100:.1f}%)')
+    if len(res) == 0:
+        print('\n\nnot found any image that similar to xxx.')
+    else:
+        print(f'\n\nImages similar to {baseimg}:')
+        for i, (hm, ipath) in enumerate(res[::-1], start=1):
+            print(f'{i}. {ipath} ({(64+hm) / 64 * 100:.1f}%)')
 
 
 if __name__ == '__main__':
