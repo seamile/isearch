@@ -6,7 +6,8 @@ from heapq import heappush, heappop, heappushpop
 
 from filetype import is_image
 from PIL import Image
-# from scipy.fft import dct, idct
+from scipy.fft import dct
+import numpy as np
 
 
 def ahash(imgpath: str) -> int:
@@ -21,25 +22,34 @@ def ahash(imgpath: str) -> int:
     for value in img_data:
         bit = 0 if value < avg else 1
         _hash = _hash << 1 | bit
-
     return _hash
 
 
 def dhash(imgpath: str) -> int:
     '''差异哈希算法'''
-    # 将图片转换为 8x8 大小的灰度图片
+    # 将图片转换为 9x8 大小的灰度图片
     gray_img = Image.open(imgpath).resize((9, 8), Image.NEAREST).convert("L")
     # 逐行比较相邻两值的大小
     _hash = 0
     img_data = gray_img.getdata()
     for idx in range(64):
         i = idx + idx // 8
-        _hash |= (img_data[i] < img_data[i + 1]) << i
+        _hash = (_hash << 1) | (img_data[i] < img_data[i + 1])
     return _hash
 
 
 def phash(imgpath: str) -> int:
-    return 0
+    image = Image.open(imgpath).resize((32, 32), Image.NEAREST).convert('L')
+    pixels = np.asarray(image)
+    dct_data = dct(dct(pixels, axis=0), axis=1)
+    dctlowfreq = dct_data[:8, :8]  # type: ignore
+    med = np.median(dctlowfreq)
+    diff = dctlowfreq < med
+    _hash = 0
+    for v in diff.flat:
+        bit = 0 if v else 1
+        _hash = _hash << 1 | bit
+    return _hash
 
 
 def hamming_distance(h1, h2):
@@ -71,7 +81,7 @@ def find_images(gallery):
 
 def search(baseimg: str, gallery, hash_func):
     heapq: list[tuple] = []
-    heap_height = 5
+    heap_height = 3
     s_hash = hash_func(baseimg)
     for num, ipath in enumerate(find_images(gallery), start=1):
         print(f'checking {num}: {ipath}', end='')
@@ -97,7 +107,7 @@ def search(baseimg: str, gallery, hash_func):
 
 if __name__ == '__main__':
     parser = ArgumentParser('isearch')
-    parser.add_argument('-a', dest='algorithm', default='ahash',
+    parser.add_argument('-a', dest='algorithm', default='dhash',
                         choices=['ahash', 'dhash', 'phash'],
                         help='the image similarity recognition algorithm (default=%(default)s)')
 
