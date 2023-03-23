@@ -78,12 +78,12 @@ def search(baseimg: str, gallery, hash_func):
     heap_height = 3
     s_hash = hash_func(baseimg)
     for num, ipath in enumerate(find_images(gallery), start=1):
-        print(f'checking {num}: {ipath}', end='')
         i_hash = hash_func(ipath)
         hm = hamming_distance(s_hash, i_hash)
-        print(f' ({hm})    ', end='\r')
+        msg = f'checking {num}: {ipath} ({hm})    '
+        print(msg, end='\r')
 
-        if hm > 10:
+        if hm > 5:
             continue
         elif hm == 0:
             heapq = [(hm, ipath)]
@@ -93,12 +93,15 @@ def search(baseimg: str, gallery, hash_func):
         else:
             heappushpop(heapq, (-hm, ipath))
 
+    # 清空前面打印的内容
+    print(' ' * (len(msg) + 4), end='\r')  # type: ignore
+
     res = [heappop(heapq) for _ in range(len(heapq))]
 
     if len(res) == 0:
-        print(f'\n\nnot found any image that similar to "{baseimg}".')
+        print(f'not found any image that similar to "{baseimg}".')
     else:
-        print(f'\n\nImages similar to {baseimg}:')
+        print(f'Images similar to "{baseimg}":')
         for i, (hm, ipath) in enumerate(res[::-1], start=1):
             print(f'{i}. {ipath} ({(64+hm) / 64 * 100:.1f}%)')
 
@@ -107,7 +110,7 @@ if __name__ == '__main__':
     parser = ArgumentParser('isearch')
     parser.add_argument('-a', dest='algorithm', default='phash',
                         choices=['ahash', 'dhash', 'phash'],
-                        help='the image similarity recognition algorithm (default=%(default)s)')
+                        help='the image similarity recognition algorithm (default: "%(default)s")')
 
     parser.add_argument('baseimg', type=str, help='the image to search')
     parser.add_argument('gallery', nargs='+', help='the gallery for searching sources')
