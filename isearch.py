@@ -91,14 +91,13 @@ def search(baseimg: str, gallery, hash_func):
 
         if hm > 10:
             continue
+        elif hm == 0:
+            heapq = [(hm, ipath)]
+            break
+        elif len(heapq) < heap_height:
+            heappush(heapq, (-hm, ipath))
         else:
-            if hm == 0:
-                heapq = [(hm, ipath)]
-                break
-            elif len(heapq) < heap_height:
-                heappush(heapq, (-hm, ipath))
-            else:
-                heappushpop(heapq, (-hm, ipath))
+            heappushpop(heapq, (-hm, ipath))
 
     res = [heappop(heapq) for _ in range(len(heapq))]
 
