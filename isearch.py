@@ -2,6 +2,7 @@
 
 import os
 from argparse import ArgumentParser
+from functools import reduce
 from heapq import heappush, heappop, heappushpop
 
 from filetype import is_image
@@ -15,41 +16,34 @@ def ahash(imgpath: str) -> int:
     # 将图片转换为 8x8 大小的灰度图片
     gray_img = Image.open(imgpath).resize((8, 8), Image.NEAREST).convert("L")
     # 计算平均值
-    img_data = gray_img.getdata()
-    avg = sum(img_data) / 64
+    pixels = gray_img.getdata()
+    avg = sum(pixels) / 64
+    bits = (pix < avg for pix in pixels)
 
-    _hash = 0
-    for value in img_data:
-        bit = 0 if value < avg else 1
-        _hash = _hash << 1 | bit
-    return _hash
+    return reduce(lambda h, b: int(h) << 1 | int(b), bits)
 
 
 def dhash(imgpath: str) -> int:
     '''差异哈希算法'''
     # 将图片转换为 9x8 大小的灰度图片
     gray_img = Image.open(imgpath).resize((9, 8), Image.NEAREST).convert("L")
+    pixels = np.asarray(gray_img)
     # 逐行比较相邻两值的大小
-    _hash = 0
-    img_data = gray_img.getdata()
-    for idx in range(64):
-        i = idx + idx // 8
-        _hash = (_hash << 1) | (img_data[i] < img_data[i + 1])
-    return _hash
+    bits = (pixels[:, :-1] < pixels[:, 1:]).astype(int).flat
+
+    return reduce(lambda h, b: int(h) << 1 | int(b), bits)
 
 
 def phash(imgpath: str) -> int:
-    image = Image.open(imgpath).resize((32, 32), Image.NEAREST).convert('L')
-    pixels = np.asarray(image)
-    dct_data = dct(dct(pixels, axis=0), axis=1)
-    dctlowfreq = dct_data[:8, :8]  # type: ignore
-    med = np.median(dctlowfreq)
-    diff = dctlowfreq < med
-    _hash = 0
-    for v in diff.flat:
-        bit = 0 if v else 1
-        _hash = _hash << 1 | bit
-    return _hash
+    '''感知哈希算法'''
+    gray_img = Image.open(imgpath).resize((32, 32), Image.NEAREST).convert('L')
+    pixels = np.asarray(gray_img).astype(float)
+    dct_low = dct(dct(pixels, axis=0), axis=1)[:8, :8]  # type: ignore
+    avg = np.mean(dct_low)
+    # 逐一与平均值比较大小
+    bits = (dct_low < avg).astype(int).flat
+
+    return reduce(lambda h, b: int(h) << 1 | int(b), bits)
 
 
 def hamming_distance(h1, h2):
@@ -102,7 +96,7 @@ def search(baseimg: str, gallery, hash_func):
     res = [heappop(heapq) for _ in range(len(heapq))]
 
     if len(res) == 0:
-        print('\n\nnot found any image that similar to xxx.')
+        print(f'\n\nnot found any image that similar to "{baseimg}".')
     else:
         print(f'\n\nImages similar to {baseimg}:')
         for i, (hm, ipath) in enumerate(res[::-1], start=1):
@@ -111,7 +105,7 @@ def search(baseimg: str, gallery, hash_func):
 
 if __name__ == '__main__':
     parser = ArgumentParser('isearch')
-    parser.add_argument('-a', dest='algorithm', default='dhash',
+    parser.add_argument('-a', dest='algorithm', default='phash',
                         choices=['ahash', 'dhash', 'phash'],
                         help='the image similarity recognition algorithm (default=%(default)s)')
 
