@@ -73,17 +73,17 @@ def find_images(gallery):
             continue
 
 
-def search(baseimg: str, gallery, hash_func):
+def search(baseimg: str, gallery, hash_func, level):
     heapq: list[tuple] = []
     heap_height = 3
     s_hash = hash_func(baseimg)
     for num, ipath in enumerate(find_images(gallery), start=1):
         i_hash = hash_func(ipath)
         hm = hamming_distance(s_hash, i_hash)
-        msg = f'checking {num}: {ipath} ({hm})    '
+        msg = f'  checking {num}: {ipath} ({hm})  '
         print(msg, end='\r')
 
-        if hm > 5:
+        if hm > level:
             continue
         elif hm == 0:
             heapq = [(hm, ipath)]
@@ -109,8 +109,12 @@ def search(baseimg: str, gallery, hash_func):
 if __name__ == '__main__':
     parser = ArgumentParser('isearch')
     parser.add_argument('-a', dest='algorithm', default='phash',
-                        choices=['ahash', 'dhash', 'phash'],
-                        help='the image similarity recognition algorithm (default: "%(default)s")')
+                        choices=['ahash', 'dhash', 'phash'], metavar='ahash/dhash/phash',
+                        help='image similarity recognition algorithm (default: "%(default)s")')
+
+    parser.add_argument('-l', dest='level', type=int, default=10,
+                        choices=range(1, 11), metavar='1-10',
+                        help='tolerance level of the similarity algorithm (default: %(default)s)')
 
     parser.add_argument('baseimg', type=str, help='the image to search')
     parser.add_argument('gallery', nargs='+', help='the gallery for searching sources')
@@ -119,7 +123,7 @@ if __name__ == '__main__':
     hash_func = {'ahash': ahash, 'dhash': dhash, 'phash': phash}[args.algorithm]
 
     if os.path.isfile(args.baseimg) and is_image(args.baseimg):
-        search(args.baseimg, args.gallery, hash_func)
+        search(args.baseimg, args.gallery, hash_func, args.level)
     else:
         print(f'{args.baseimg} is not a image')
         exit(1)
