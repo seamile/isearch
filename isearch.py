@@ -13,6 +13,8 @@ from filetype import is_image
 from PIL import Image
 from scipy.fft import dct
 
+__version__ = '0.1.1'
+
 
 def ahash(imgpath: str) -> int:
     '''平均哈希算法'''
@@ -177,7 +179,7 @@ def parallel_search(baseimg: str, gallery: Iterable[str], hash_fn: Callable, lev
             print(f'{i}. {ipath} ({(64+hm) / 64 * 100:.1f}%)')
 
 
-if __name__ == '__main__':
+def main():
     parser = ArgumentParser('isearch')
     parser.add_argument('-a', dest='algorithm', default='phash',
                         choices=['ahash', 'dhash', 'phash'], metavar='ahash/dhash/phash',
@@ -186,6 +188,9 @@ if __name__ == '__main__':
     parser.add_argument('-l', dest='level', type=int, default=10,
                         choices=range(1, 11), metavar='1-10',
                         help='tolerance level of the similarity algorithm (default: %(default)s)')
+
+    parser.add_argument('-v', dest='version', action='version', version=__version__,
+                        help="show isearch's version")
 
     parser.add_argument('baseimg', type=str, help='the image to search')
     parser.add_argument('gallery', nargs='+', help='the gallery for searching sources')
@@ -198,3 +203,7 @@ if __name__ == '__main__':
     else:
         print(f'{args.baseimg} is not a image')
         exit(1)
+
+
+if __name__ == '__main__':
+    main()
