@@ -4,11 +4,14 @@ import os
 from argparse import ArgumentParser
 from functools import reduce
 from heapq import heappush, heappop, heappushpop
+from queue import Queue, Empty
+from threading import Thread
+from typing import Callable, Generator, Iterable
 
+import numpy as np
 from filetype import is_image
 from PIL import Image
 from scipy.fft import dct
-import numpy as np
 
 
 def ahash(imgpath: str) -> int:
@@ -46,7 +49,8 @@ def phash(imgpath: str) -> int:
     return reduce(lambda h, b: int(h) << 1 | int(b), bits)
 
 
-def hamming_distance(h1, h2):
+def hamming_distance(h1: int, h2: int) -> int:
+    '''汉明距离'''
     v = (h1 ^ h2)
     v -= (v >> 1) & 0x5555555555555555
     v = (v & 0x3333333333333333) + ((v >> 2) & 0x3333333333333333)
@@ -57,7 +61,7 @@ def hamming_distance(h1, h2):
     return v & 0xff
 
 
-def find_images(gallery):
+def find_images(gallery: Iterable[str]) -> Generator[str, None, None]:
     for item in gallery:
         if os.path.isdir(item):
             for root, _, files in os.walk(item):
@@ -73,13 +77,13 @@ def find_images(gallery):
             continue
 
 
-def search(baseimg: str, gallery, hash_func, level):
+def search(baseimg: str, gallery: Iterable[str], hash_fn: Callable, level: int):
     heapq: list[tuple] = []
     heap_height = 3
-    s_hash = hash_func(baseimg)
+    b_hash = hash_fn(baseimg)
     for num, ipath in enumerate(find_images(gallery), start=1):
-        i_hash = hash_func(ipath)
-        hm = hamming_distance(s_hash, i_hash)
+        i_hash = hash_fn(ipath)
+        hm = hamming_distance(b_hash, i_hash)
         msg = f'  checking {num}: {ipath} ({hm})  '
         print(msg, end='\r')
 
@@ -106,6 +110,73 @@ def search(baseimg: str, gallery, hash_func, level):
             print(f'{i}. {ipath} ({(64+hm) / 64 * 100:.1f}%)')
 
 
+class Worker(Thread):
+    def __init__(self, task_q: Queue, result_q: Queue,
+                 hash_fn: Callable, base_hash: int, level: int):
+        super().__init__(daemon=True)
+        self.task_q = task_q
+        self.result_q = result_q
+        self.hash_fn = hash_fn
+        self.base_hash = base_hash
+        self.level = level
+
+    def run(self):
+        while True:
+            img_path = self.task_q.get()
+            img_hash = self.hash_fn(img_path)
+            hm = hamming_distance(self.base_hash, img_hash)
+            print(f' > {img_path[-30:]} {(1-hm/64)*100:4.1f}%', end='      \r')
+            if hm <= self.level:
+                self.result_q.put((hm, img_path))
+            self.task_q.task_done()
+
+
+def put_img_to_queue(gallery: Iterable[str], task_q: Queue):
+    for p in find_images(gallery):
+        task_q.put(p)
+
+
+def parallel_search(baseimg: str, gallery: Iterable[str], hash_fn: Callable, level: int):
+    heapq: list[tuple] = []
+    heap_height = 3
+    b_hash = hash_fn(baseimg)
+    task_q: Queue[str] = Queue()
+    result_q: Queue[tuple[int, str]] = Queue()
+
+    # 创建并启动工作线程
+    workers = [Worker(task_q, result_q, hash_fn, b_hash, level)
+               for _ in range(os.cpu_count() or 4)]
+    for w in workers:
+        w.start()
+
+    finder = Thread(target=put_img_to_queue, args=(gallery, task_q))
+    finder.start()
+
+    while finder.is_alive() or task_q.unfinished_tasks or not result_q.empty():
+        try:
+            hm, ipath = result_q.get(timeout=0.5)
+        except Empty:
+            continue
+
+        if hm == 0:
+            heapq = [(hm, ipath)]
+            break
+        elif len(heapq) < heap_height:
+            heappush(heapq, (-hm, ipath))
+        else:
+            heappushpop(heapq, (-hm, ipath))
+    print(' ' * 50, end='\r')
+
+    res = [heappop(heapq) for _ in range(len(heapq))]
+
+    if len(res) == 0:
+        print(f'not found any image that similar to "{baseimg}".')
+    else:
+        print(f'Images similar to "{baseimg}":')
+        for i, (hm, ipath) in enumerate(res[::-1], start=1):
+            print(f'{i}. {ipath} ({(64+hm) / 64 * 100:.1f}%)')
+
+
 if __name__ == '__main__':
     parser = ArgumentParser('isearch')
     parser.add_argument('-a', dest='algorithm', default='phash',
@@ -120,10 +191,10 @@ if __name__ == '__main__':
     parser.add_argument('gallery', nargs='+', help='the gallery for searching sources')
     args = parser.parse_args()
 
-    hash_func = {'ahash': ahash, 'dhash': dhash, 'phash': phash}[args.algorithm]
+    hash_fn = {'ahash': ahash, 'dhash': dhash, 'phash': phash}[args.algorithm]
 
     if os.path.isfile(args.baseimg) and is_image(args.baseimg):
-        search(args.baseimg, args.gallery, hash_func, args.level)
+        parallel_search(args.baseimg, args.gallery, hash_fn, args.level)
     else:
         print(f'{args.baseimg} is not a image')
         exit(1)
