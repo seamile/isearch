@@ -1,5 +1,8 @@
 # isearch
 
+![PyPI - Downloads](https://img.shields.io/pypi/dm/similar-search?label=Install&color=green)
+![PyPI](https://img.shields.io/pypi/v/similar-search?color=9cf)
+
 An image search tool to find similar images on your disk.
 
 ## Install
