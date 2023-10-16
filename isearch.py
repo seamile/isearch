@@ -3,8 +3,8 @@
 import os
 from argparse import ArgumentParser
 from functools import reduce
-from heapq import heappush, heappop, heappushpop
-from queue import Queue, Empty
+from heapq import heappop, heappush, heappushpop
+from queue import Empty, Queue
 from threading import Thread
 from typing import Callable, Generator, Iterable
 
@@ -36,7 +36,7 @@ def dhash(imgpath: str) -> int:
     # 逐行比较相邻两值的大小
     bits = (pixels[:, :-1] < pixels[:, 1:]).astype(int).flat
 
-    return reduce(lambda h, b: int(h) << 1 | int(b), bits)
+    return reduce(lambda h, b: int(h) << 1 | int(b), bits)  # type: ignore
 
 
 def phash(imgpath: str) -> int:
@@ -61,6 +61,14 @@ def hamming_distance(h1: int, h2: int) -> int:
     v += v >> 16
     v += v >> 32
     return v & 0xff
+
+
+def similarity(img1, img2, fn=phash) -> float:
+    '''计算两张图片的相似度'''
+    h1 = fn(img1)
+    h2 = fn(img2)
+    hm = hamming_distance(h1, h2)
+    return round((64 - hm) / 64, 2)
 
 
 def find_images(gallery: Iterable[str]) -> Generator[str, None, None]:
@@ -127,7 +135,7 @@ class Worker(Thread):
             img_path = self.task_q.get()
             img_hash = self.hash_fn(img_path)
             hm = hamming_distance(self.base_hash, img_hash)
-            print(f' > {img_path[-30:]} {(1-hm/64)*100:4.1f}%', end='      \r')
+            print(f' > {img_path[-30:]} {(1-hm/64)*100:4.1f}%', end='           \r')
             if hm <= self.level:
                 self.result_q.put((hm, img_path))
             self.task_q.task_done()
@@ -193,7 +201,8 @@ def main():
                         help="show isearch's version")
 
     parser.add_argument('baseimg', type=str, help='the image to search')
-    parser.add_argument('gallery', nargs='+', help='the gallery for searching sources')
+    parser.add_argument('gallery', nargs='*', default=['.'],
+                        help='the gallery for searching sources')
     args = parser.parse_args()
 
     hash_fn = {'ahash': ahash, 'dhash': dhash, 'phash': phash}[args.algorithm]
