@@ -94,8 +94,7 @@ def search(baseimg: str, gallery: Iterable[str], hash_fn: Callable, level: int):
     for num, ipath in enumerate(find_images(gallery), start=1):
         i_hash = hash_fn(ipath)
         hm = hamming_distance(b_hash, i_hash)
-        msg = f'  checking {num}: {ipath} ({hm})  '
-        print(msg, end='\r')
+        print(f'  checking {num}: {ipath} ({hm})', end='\033[K\r')
 
         if hm > level:
             continue
@@ -107,17 +106,14 @@ def search(baseimg: str, gallery: Iterable[str], hash_fn: Callable, level: int):
         else:
             heappushpop(heapq, (-hm, ipath))
 
-    # 清空前面打印的内容
-    print(' ' * (len(msg) + 4), end='\r')  # type: ignore
-
     res = [heappop(heapq) for _ in range(len(heapq))]
 
     if len(res) == 0:
-        print(f'not found any image that similar to "{baseimg}".')
+        print(f'not found any image that similar to "{baseimg}".', end='\033[K\n')
     else:
-        print(f'Images similar to "{baseimg}":')
+        print(f'Images similar to "{baseimg}":', end='\033[K\n')
         for i, (hm, ipath) in enumerate(res[::-1], start=1):
-            print(f'{i}. {ipath} ({(64+hm) / 64 * 100:.1f}%)')
+            print(f'{i}. {ipath} ({(64 + hm) / 64 * 100:.1f}%)')
 
 
 class Worker(Thread):
@@ -135,7 +131,7 @@ class Worker(Thread):
             img_path = self.task_q.get()
             img_hash = self.hash_fn(img_path)
             hm = hamming_distance(self.base_hash, img_hash)
-            print(f' > {img_path[-30:]} {(1-hm/64)*100:4.1f}%', end='           \r')
+            print(f' > {img_path[-30:]} {(1 - hm / 64) * 100:4.1f}%', end='\033[K\r')
             if hm <= self.level:
                 self.result_q.put((hm, img_path))
             self.task_q.task_done()
@@ -175,16 +171,15 @@ def parallel_search(baseimg: str, gallery: Iterable[str], hash_fn: Callable, lev
             heappush(heapq, (-hm, ipath))
         else:
             heappushpop(heapq, (-hm, ipath))
-    print(' ' * 50, end='\r')
 
     res = [heappop(heapq) for _ in range(len(heapq))]
 
     if len(res) == 0:
-        print(f'not found any image that similar to "{baseimg}".')
+        print(f'not found any image that similar to "{baseimg}".', end='\033[K\n')
     else:
-        print(f'Images similar to "{baseimg}":')
+        print(f'Images similar to "{baseimg}":', end='\033[K\n')
         for i, (hm, ipath) in enumerate(res[::-1], start=1):
-            print(f'{i}. {ipath} ({(64+hm) / 64 * 100:.1f}%)')
+            print(f'{i}. {ipath} ({(64 + hm) / 64 * 100:.1f}%)')
 
 
 def main():
